@@ -1,0 +1,259 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>今天吃什么</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: 'Microsoft YaHei', sans-serif;
+        }
+
+        body {
+            background-color: #f5f5f5;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+        }
+
+        .container {
+            text-align: center;
+            background-color: white;
+            padding: 30px;
+            border-radius: 15px;
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.1);
+            max-width: 500px;
+            width: 100%;
+        }
+
+        h1 {
+            color: #ff6b6b;
+            margin-bottom: 30px;
+            font-size: 2.5rem;
+        }
+
+        .wheel-container {
+            position: relative;
+            width: 300px;
+            height: 300px;
+            margin: 0 auto 30px;
+        }
+
+        .wheel {
+            width: 100%;
+            height: 100%;
+            border-radius: 50%;
+            position: relative;
+            overflow: hidden;
+            transition: transform 4s cubic-bezier(0.17, 0.67, 0.12, 0.99);
+            box-shadow: 0 0 0 5px #ff6b6b, 0 0 0 15px #fff, 0 0 0 18px #ff6b6b;
+        }
+
+        /* 标签的通用样式 */
+        .wheel-label {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform-origin: center center;
+            color: #fff;
+            font-weight: bold;
+            font-size: 16px;
+            padding: 4px 8px;
+            border-radius: 4px;
+            background: rgba(0, 0, 0, 0.6);
+            white-space: nowrap;
+            pointer-events: none; /* 防止点击选中文本 */
+            text-shadow: 1px 1px 2px rgba(0,0,0,0.6);
+            z-index: 2; /* 保证在扇形上面 */
+        }
+
+        .wheel-item {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 50%;
+            height: 50%;
+            transform-origin: bottom right;
+            display: block;
+            color: white;
+            z-index: 1;
+        }
+
+        .wheel-item span {
+            display: inline-block;
+            padding: 6px 10px;
+            background-color: rgba(0, 0, 0, 0.8);
+            border-radius: 4px;
+            white-space: nowrap;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.5);
+            font-size: 20px;
+            min-width: 60px;
+            text-align: center;
+            font-weight: bold;
+            color: white;
+            text-shadow: 1px 1px 2px black;
+        }
+
+        .wheel-arrow {
+            position: absolute;
+            top: -10px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 0;
+            height: 0;
+            border-left: 15px solid transparent;
+            border-right: 15px solid transparent;
+            border-top: 30px solid #ff6b6b;
+            z-index: 10;
+        }
+
+        #spin-button {
+            background-color: #ff6b6b;
+            color: white;
+            border: none;
+            padding: 12px 30px;
+            font-size: 18px;
+            border-radius: 30px;
+            cursor: pointer;
+            transition: background-color 0.3s;
+            margin-bottom: 20px;
+        }
+
+        #spin-button:hover {
+            background-color: #ff5252;
+        }
+
+        #spin-button:disabled {
+            background-color: #cccccc;
+            cursor: not-allowed;
+        }
+
+        .result {
+            font-size: 24px;
+            font-weight: bold;
+            color: #333;
+            height: 40px;
+            margin-top: 20px;
+            transition: opacity 0.5s;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+
+        .fade-in {
+            animation: fadeIn 1s;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>今天吃什么</h1>
+        <div class="wheel-container">
+            <div class="wheel" id="wheel">
+                <!-- 菜品将通过JavaScript动态添加 -->
+            </div>
+            <div class="wheel-arrow"></div>
+        </div>
+        <button id="spin-button">开始抽取</button>
+        <div id="result" class="result"></div>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', function () {
+          // 菜品列表
+          const dishes = [
+            '火锅', '烤肉', '麻辣烫', '炒饭', '面条',
+            '寿司', '汉堡', '披萨', '沙拉', '炸鸡',
+            '水饺', '包子', '粥', '牛排', '烧烤',
+            '冒菜', '盖浇饭', '煲仔饭', '米线', '饺子'
+          ];
+
+          const wheel = document.getElementById('wheel');
+          const spinButton = document.getElementById('spin-button');
+          const resultElement = document.getElementById('result');
+          let isSpinning = false;
+
+          // 创建转盘
+          function createWheel() {
+            const itemCount = dishes.length;
+            const anglePerItem = 360 / itemCount;
+            const colors = [
+              '#FF6B6B', '#4ECDC4', '#FFD166', '#06D6A0', '#118AB2',
+              '#073B4C', '#EF476F', '#FFC43D', '#1B9AAA', '#6D597A'
+            ];
+
+            // 清空转盘
+            wheel.innerHTML = '';
+
+            const radius = Math.min(wheel.clientWidth, wheel.clientHeight) / 2;
+            const labelRadius = radius - 32; // 让文字靠近外圈
+
+            for (let i = 0; i < itemCount; i++) {
+              // 扇形区域（背景色）
+              const slice = document.createElement('div');
+              slice.className = 'wheel-item';
+              slice.style.transform = `rotate(${i * anglePerItem}deg)`;
+              slice.style.backgroundColor = colors[i % colors.length];
+              wheel.appendChild(slice);
+
+              // 文本标签（不被扇形裁剪）
+              const label = document.createElement('div');
+              label.className = 'wheel-label';
+              label.textContent = dishes[i];
+
+              const centerAngle = i * anglePerItem + anglePerItem / 2; // 扇形中心角度
+              // 以圆心为基准，旋转到该角度后向上（负Y）移动指定半径，再反向旋转使文字水平
+              label.style.transform = `translate(-50%, -50%) rotate(${centerAngle}deg) translate(0, -${labelRadius}px) rotate(${-centerAngle}deg)`;
+              wheel.appendChild(label);
+            }
+          }
+
+          // 旋转转盘
+          function spinWheel() {
+            if (isSpinning) return;
+
+            isSpinning = true;
+            spinButton.disabled = true;
+            resultElement.textContent = '';
+            resultElement.classList.remove('fade-in');
+
+            // 随机旋转角度 (5-10圈 + 随机角度)
+            const itemCount = dishes.length;
+            const anglePerItem = 360 / itemCount;
+            const spinCount = 5 + Math.floor(Math.random() * 5);
+            const extraDegrees = Math.floor(Math.random() * 360);
+            const totalDegrees = spinCount * 360 + extraDegrees;
+
+            // 设置旋转动画
+            wheel.style.transform = `rotate(${totalDegrees}deg)`;
+
+            // 计算结果
+            setTimeout(() => {
+              const normalizedDegree = (360 - (totalDegrees % 360)) % 360; // 指针在上方
+              const itemIndex = Math.floor(normalizedDegree / anglePerItem) % itemCount;
+
+              const selectedDish = dishes[itemIndex];
+
+              setTimeout(() => {
+                resultElement.textContent = `今天吃：${selectedDish}！`;
+                resultElement.classList.add('fade-in');
+                isSpinning = false;
+                spinButton.disabled = false;
+              }, 300);
+            }, 4000); // 与CSS过渡时间一致
+          }
+
+          // 初始化
+          createWheel();
+          // 点击抽取
+          spinButton.addEventListener('click', spinWheel);
+        });
+    </script>
+</body>
+</html>
